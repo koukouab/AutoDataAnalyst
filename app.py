@@ -43,7 +43,7 @@ signature_fichier = hashlib.md5(contenu_csv).hexdigest()
 if st.session_state.get("signature_fichier") != signature_fichier:
 
     try:
-        df_charge = pd.read_csv(BytesIO(contenu_csv))
+        df_charge = pd.read_csv(BytesIO(contenu_csv), sep=None, engine="python")
 
     except Exception as erreur:
         st.error(f"Impossible de lire le fichier CSV : {erreur}")
