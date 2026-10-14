@@ -21,7 +21,6 @@ st.write(
     "de qualité et préparez vos données pour l'analyse."
 )
 
-```python
 # --------------------------------------------------
 # IMPORT DES DONNÉES : FICHIER CSV OU LIEN URL
 # --------------------------------------------------
@@ -144,7 +143,6 @@ if st.session_state.get("signature_fichier") != signature_fichier:
 
 # Les analyses utilisent la copie de travail actuelle
 df = st.session_state["df_nettoye"]
-```
 
 # --------------------------------------------------
 # BOUTON DE REINITIALISATION
