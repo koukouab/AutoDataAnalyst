@@ -21,59 +21,130 @@ st.write(
     "de qualité et préparez vos données pour l'analyse."
 )
 
+```python
 # --------------------------------------------------
-# IMPORT DU FICHIER
+# IMPORT DES DONNÉES : FICHIER CSV OU LIEN URL
 # --------------------------------------------------
 
-fichier = st.file_uploader(
-    "Importez votre fichier CSV",
-    type=["csv"],
-    key="import_csv"
+import hashlib
+from io import BytesIO
+
+st.subheader("Importer les données")
+
+mode_import = st.radio(
+    "Comment souhaitez-vous importer vos données ?",
+    ["Fichier CSV depuis mon ordinateur", "Lien direct vers un CSV"],
+    horizontal=True,
+    key="mode_import"
 )
 
-if fichier is None:
-    st.info("Importez un fichier CSV pour commencer.")
-    st.stop()
+df_charge = None
+signature_fichier = None
 
-# Lire le contenu et identifier le fichier importé
-contenu_csv = fichier.getvalue()
-signature_fichier = hashlib.md5(contenu_csv).hexdigest()
+if mode_import == "Fichier CSV depuis mon ordinateur":
 
-# Charger le CSV uniquement si le fichier a changé
-if st.session_state.get("signature_fichier") != signature_fichier:
+    fichier = st.file_uploader(
+        "Sélectionnez votre fichier CSV",
+        type=["csv"],
+        key="import_csv"
+    )
+
+    if fichier is None:
+        st.info("Importez un fichier CSV pour commencer.")
+        st.stop()
+
+    contenu_csv = fichier.getvalue()
+    signature_fichier = hashlib.md5(contenu_csv).hexdigest()
 
     try:
-        df_charge = pd.read_csv(BytesIO(contenu_csv), sep=None, engine="python")
-
+        df_charge = pd.read_csv(
+            BytesIO(contenu_csv),
+            sep=None,
+            engine="python"
+        )
     except Exception as erreur:
         st.error(f"Impossible de lire le fichier CSV : {erreur}")
         st.stop()
 
-    if len(df_charge.columns) == 0:
-        st.warning("Le fichier ne contient aucune colonne exploitable.")
+else:
+
+    url_csv = st.text_input(
+        "Collez le lien direct vers votre fichier CSV",
+        placeholder="https://exemple.com/donnees.csv",
+        key="url_csv"
+    )
+
+    if not url_csv.strip():
+        st.info("Collez un lien direct vers un fichier CSV pour commencer.")
         st.stop()
 
-    # Conserver l'original et créer la copie de travail
+    if not url_csv.strip().lower().startswith(("https://", "http://")):
+        st.error("Le lien doit commencer par http:// ou https://.")
+        st.stop()
+
+    if st.button("Charger les données depuis le lien", key="charger_url"):
+        try:
+            import requests
+
+            reponse = requests.get(
+                url_csv.strip(),
+                timeout=20
+            )
+            reponse.raise_for_status()
+
+            contenu_csv = reponse.content
+            signature_fichier = hashlib.md5(contenu_csv).hexdigest()
+
+            df_charge = pd.read_csv(
+                BytesIO(contenu_csv),
+                sep=None,
+                engine="python"
+            )
+
+            st.session_state["url_chargee"] = url_csv.strip()
+            st.session_state["contenu_url"] = contenu_csv
+            st.session_state["signature_url"] = signature_fichier
+
+        except Exception as erreur:
+            st.error(f"Impossible de charger le CSV depuis ce lien : {erreur}")
+            st.stop()
+
+    # Conserver le résultat du chargement lors des reruns Streamlit
+    if st.session_state.get("url_chargee") == url_csv.strip():
+        contenu_csv = st.session_state["contenu_url"]
+        signature_fichier = st.session_state["signature_url"]
+
+        try:
+            df_charge = pd.read_csv(
+                BytesIO(contenu_csv),
+                sep=None,
+                engine="python"
+            )
+        except Exception as erreur:
+            st.error(f"Impossible de lire le CSV : {erreur}")
+            st.stop()
+
+    else:
+        st.stop()
+
+# Vérifier que les données ont bien été chargées
+if df_charge is None or len(df_charge.columns) == 0:
+    st.error("Aucune colonne n'a été détectée dans les données.")
+    st.stop()
+
+# Initialiser les données uniquement lors d'un nouvel import
+if st.session_state.get("signature_fichier") != signature_fichier:
     st.session_state["df_original"] = df_charge.copy(deep=True)
     st.session_state["df_nettoye"] = df_charge.copy(deep=True)
     st.session_state["signature_fichier"] = signature_fichier
-
-    # Réinitialiser les indicateurs de vérification
     st.session_state["doublons_verifies"] = False
     st.session_state["nb_doublons_verifies"] = 0
     st.session_state["criteres_verifies"] = []
-
-    # Fermer une éventuelle confirmation de réinitialisation
     st.session_state["demande_reinitialisation"] = False
 
-# --------------------------------------------------
-# DONNEES DE TRAVAIL
-# --------------------------------------------------
-
-# IMPORTANT :
-# Toutes les analyses du début de l'application utilisent
-# désormais les données actuellement nettoyées.
+# Les analyses utilisent la copie de travail actuelle
 df = st.session_state["df_nettoye"]
+```
 
 # --------------------------------------------------
 # BOUTON DE REINITIALISATION
